@@ -1,0 +1,4 @@
+# Ejemplo del libro para eliminar producciones ε (PDF del catedrático, página 1)
+S -> A B
+A -> a A A | e
+B -> b B B | e

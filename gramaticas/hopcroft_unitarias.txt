@@ -1,0 +1,5 @@
+# Ejemplo del libro para eliminar producciones unitarias y convertir a CNF (PDF, páginas 1 y 3)
+E -> T | E + T
+T -> F | T * F
+F -> I | ( E )
+I -> a | b | I a | I b | I 0 | I 1

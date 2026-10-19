@@ -1,0 +1,3 @@
+# Ejemplo del libro para eliminar símbolos inútiles (PDF, página 3)
+S -> A B | a
+A -> b

@@ -1,0 +1,2 @@
+# a^n b^n con n >= 0: la cadena vacía SÍ pertenece al lenguaje
+S -> a S b | e

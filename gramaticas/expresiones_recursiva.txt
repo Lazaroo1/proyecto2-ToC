@@ -1,0 +1,4 @@
+# Gramática de expresiones con recursión por la izquierda (PDF del catedrático, página 1)
+E -> E + T | T
+T -> T * F | F
+F -> ( E ) | id
