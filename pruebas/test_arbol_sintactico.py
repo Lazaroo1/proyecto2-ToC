@@ -6,6 +6,7 @@ from algoritmos.cyk import construir_arbol_sintactico, cyk
 from algoritmos.forma_normal_chomsky import convertir_a_cnf
 from entrada_salida.lector_gramatica import leer_gramatica_desde_archivo
 from entrada_salida.tokenizador import tokenizar_frase
+from entrada_salida.visualizacion_arbol import arbol_a_corchetes
 from modelos.nodo_arbol import NodoArbol
 from pruebas.test_cyk import EXPRESIONES_SI, FRASES_INGLES_SI, RUTA_GRAMATICAS
 
@@ -14,13 +15,6 @@ ARBOL_INGLES = (
     "[PP [P with] [NP [Det a] [N fork]]]]]"
 )
 ARBOL_EXPRESION = "[E [T [L (] [Z [E [F id] [Y [M *] [F id]]] [R )]]] [X [P +] [T id]]]"
-
-
-def a_corchetes(nodo: NodoArbol) -> str:
-    """Representación local para comparar estructuras."""
-    if nodo.es_hoja():
-        return nodo.simbolo
-    return f"[{nodo.simbolo} {' '.join(a_corchetes(hijo) for hijo in nodo.hijos)}]"
 
 
 class PruebaArbolSintactico(unittest.TestCase):
@@ -39,7 +33,7 @@ class PruebaArbolSintactico(unittest.TestCase):
                     self.assertEqual(arbol.simbolo, gramatica.simbolo_inicial)
                     self.assertEqual(arbol.obtener_hojas(), tokens)
                     if posicion == 0:
-                        self.assertEqual(a_corchetes(arbol), esperado)
+                        self.assertEqual(arbol_a_corchetes(arbol), esperado)
 
     def test_rechazo_vacia_altura_y_nodos(self) -> None:
         gramatica = leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "ingles.txt")
