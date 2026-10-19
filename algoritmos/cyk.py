@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from algoritmos.forma_normal_chomsky import es_forma_normal_chomsky
 from modelos.gramatica import Gramatica
+from modelos.nodo_arbol import NodoArbol
 
 Retroceso = str | tuple[int, str, str]
 
@@ -57,3 +58,21 @@ def cyk(gramatica_cnf: Gramatica, tokens: list[str],
                         retroceso.setdefault((inicio, fin, cabeza), (corte, izquierda, derecha))
     acepta = gramatica_cnf.simbolo_inicial in tabla[0][cantidad_tokens - 1]
     return ResultadoCYK(list(tokens), tabla, acepta, retroceso)
+
+
+def construir_arbol_sintactico(resultado: ResultadoCYK, simbolo_inicial: str) -> NodoArbol | None:
+    """Reconstruye la primera derivación encontrada por CYK, sobre la CNF."""
+    if not resultado.acepta:
+        return None
+    if not resultado.tokens:
+        return NodoArbol(simbolo_inicial, [NodoArbol("ε")])
+
+    def construir_nodo(inicio: int, fin: int, cabeza: str) -> NodoArbol:
+        origen = resultado.retroceso[(inicio, fin, cabeza)]
+        if isinstance(origen, str):
+            return NodoArbol(cabeza, [NodoArbol(origen)])
+        corte, izquierda, derecha = origen
+        return NodoArbol(cabeza, [construir_nodo(inicio, corte, izquierda),
+                                 construir_nodo(corte + 1, fin, derecha)])
+
+    return construir_nodo(0, len(resultado.tokens) - 1, simbolo_inicial)
