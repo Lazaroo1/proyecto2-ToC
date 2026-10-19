@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Archivos de planificacion locales (NO se suben al repo)
+/commits.md
+/instrucciones.md
+/agents.md
+/CLAUDE.md
+
+# Salidas generadas por el programa (arboles .dot/.png, gramaticas exportadas)
+salidas/
