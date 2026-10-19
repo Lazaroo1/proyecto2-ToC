@@ -8,6 +8,7 @@ from algoritmos.eliminar_inutiles import eliminar_simbolos_inutiles
 from algoritmos.eliminar_unitarias import eliminar_producciones_unitarias
 from algoritmos.forma_normal_chomsky import (
     LETRAS_PARA_VARIABLES_NUEVAS,
+    binarizar_cuerpos_largos,
     es_forma_normal_chomsky,
     generar_nombre_variable_nueva,
     generar_nombre_variable_para_terminal,
@@ -144,6 +145,63 @@ class PruebaReemplazarTerminales(unittest.TestCase):
         texto_antes = gramatica_a_texto(gramatica)
         reemplazar_terminales_en_cuerpos_largos(gramatica)
         self.assertEqual(gramatica_a_texto(gramatica), texto_antes)
+
+
+class PruebaBinarizarCuerposLargos(unittest.TestCase):
+    """Construcción (b) de CNF."""
+
+    def setUp(self) -> None:
+        gramatica_simplificada = simplificar_gramatica(leer_gramatica_de_ejemplo("1.txt"))
+        self.gramatica_paso_a, _ = reemplazar_terminales_en_cuerpos_largos(gramatica_simplificada)
+
+    def test_gramatica_uno_reutiliza_sufijos(self) -> None:
+        resultado, variable_por_sufijo = binarizar_cuerpos_largos(self.gramatica_paso_a)
+        self.assertEqual(
+            list(variable_por_sufijo.items()),
+            [(("E", "R"), "Z"), (("T", "X"), "W"), (("F", "Y"), "V")],
+        )
+        # Todavía sin reordenar: las variables de terminales van antes que las nuevas.
+        self.assertEqual(
+            gramatica_a_texto(resultado),
+            "E -> T X | F Y | L Z | id\n"
+            "X -> P W | P T\n"
+            "T -> F Y | L Z | id\n"
+            "Y -> M V | M F\n"
+            "F -> L Z | id\n"
+            "L -> (\n"
+            "R -> )\n"
+            "P -> +\n"
+            "M -> *\n"
+            "Z -> E R\n"
+            "W -> T X\n"
+            "V -> F Y",
+        )
+
+    def test_la_misma_variable_sirve_a_varias_cabezas(self) -> None:
+        resultado, _ = binarizar_cuerpos_largos(self.gramatica_paso_a)
+        for variable in ("E", "T", "F"):
+            with self.subTest(variable=variable):
+                self.assertIn(("L", "Z"), resultado.obtener_producciones(variable))
+
+    def test_cuerpo_de_longitud_cuatro(self) -> None:
+        gramatica = leer_gramatica_desde_texto("A -> B C D E\nB -> b\nC -> c\nD -> d\nE -> e2")
+        resultado, variable_por_sufijo = binarizar_cuerpos_largos(gramatica)
+        self.assertEqual(
+            list(variable_por_sufijo.items()), [(("C", "D", "E"), "Z"), (("D", "E"), "Y")]
+        )
+        self.assertEqual(resultado.obtener_producciones("A"), [("B", "Z")])
+        self.assertEqual(resultado.obtener_producciones("Z"), [("C", "Y")])
+        self.assertEqual(resultado.obtener_producciones("Y"), [("D", "E")])
+
+    def test_el_resultado_queda_en_cnf(self) -> None:
+        resultado, _ = binarizar_cuerpos_largos(self.gramatica_paso_a)
+        self.assertTrue(es_forma_normal_chomsky(resultado))
+
+    def test_cuerpos_cortos_no_cambian(self) -> None:
+        gramatica_ingles = leer_gramatica_de_ejemplo("ingles.txt")
+        resultado, variable_por_sufijo = binarizar_cuerpos_largos(gramatica_ingles)
+        self.assertEqual(variable_por_sufijo, {})
+        self.assertEqual(gramatica_a_texto(resultado), gramatica_a_texto(gramatica_ingles))
 
 
 if __name__ == "__main__":

@@ -12,6 +12,10 @@ frase vacía por separado.
 Construcción (a): para cada terminal a que aparece en un cuerpo de longitud 2
 o más, se crea una variable nueva A con una única producción A -> a, y se usa
 A en lugar de a en esos cuerpos.
+
+Construcción (b): cada producción A -> B1 B2 … Bk con k ≥ 3 se parte con k − 2
+variables nuevas: A -> B1 C1, C1 -> B2 C2, …, Ck−2 -> Bk−1 Bk. Si varios
+cuerpos comparten el mismo sufijo, se reutiliza la misma variable.
 """
 
 from __future__ import annotations
@@ -147,6 +151,55 @@ def reemplazar_terminales_en_cuerpos_largos(gramatica: Gramatica) -> tuple[Grama
     for terminal, variable_nueva in variable_por_terminal.items():
         gramatica_resultante.agregar_produccion(variable_nueva, (terminal,))
     return gramatica_resultante, variable_por_terminal
+
+
+def binarizar_cuerpos_largos(gramatica: Gramatica) -> tuple[Gramatica, dict[Cuerpo, str]]:
+    """Construcción (b) de CNF: parte los cuerpos de longitud k ≥ 3 en cuerpos de 2 variables.
+
+    Un cuerpo B1 B2 … Bk queda como B1 V, donde V es la variable del sufijo
+    (B2, …, Bk). Esa variable tiene como cuerpo el sufijo (si mide 2) o
+    (B2, variable del sufijo siguiente). El mismo sufijo siempre reutiliza la
+    misma variable, y el sufijo más largo se nombra primero. Las variables
+    nuevas se agregan al final, en orden de creación.
+
+    Parámetros:
+        gramatica: gramática cuyos cuerpos largos ya no tienen terminales (no se modifica).
+
+    Retorna:
+        La gramática nueva y el diccionario sufijo -> variable nueva, en orden de creación.
+    """
+    nombres_usados = set(gramatica.variables) | set(gramatica.terminales)
+    variable_por_sufijo: dict[Cuerpo, str] = {}
+    cuerpo_de_cada_variable_nueva: dict[str, Cuerpo] = {}
+
+    def obtener_variable_del_sufijo(sufijo: Cuerpo) -> str:
+        if sufijo in variable_por_sufijo:
+            return variable_por_sufijo[sufijo]
+        variable_nueva = generar_nombre_variable_nueva(nombres_usados)
+        variable_por_sufijo[sufijo] = variable_nueva
+        if len(sufijo) == 2:
+            cuerpo_de_cada_variable_nueva[variable_nueva] = sufijo
+        else:
+            cuerpo_de_cada_variable_nueva[variable_nueva] = (
+                sufijo[0],
+                obtener_variable_del_sufijo(sufijo[1:]),
+            )
+        return variable_nueva
+
+    gramatica_resultante = Gramatica(gramatica.simbolo_inicial)
+    for variable in gramatica.variables:
+        gramatica_resultante.agregar_variable(variable)
+    for variable in gramatica.variables:
+        for cuerpo in gramatica.obtener_producciones(variable):
+            if len(cuerpo) >= 3:
+                cuerpo = (cuerpo[0], obtener_variable_del_sufijo(cuerpo[1:]))
+            gramatica_resultante.agregar_produccion(variable, cuerpo)
+
+    for variable_nueva in variable_por_sufijo.values():
+        gramatica_resultante.agregar_produccion(
+            variable_nueva, cuerpo_de_cada_variable_nueva[variable_nueva]
+        )
+    return gramatica_resultante, variable_por_sufijo
 
 
 def _es_produccion_en_cnf(gramatica: Gramatica, cuerpo: Cuerpo) -> bool:
