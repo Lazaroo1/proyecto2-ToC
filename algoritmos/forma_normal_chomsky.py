@@ -16,11 +16,33 @@ A en lugar de a en esos cuerpos.
 Construcción (b): cada producción A -> B1 B2 … Bk con k ≥ 3 se parte con k − 2
 variables nuevas: A -> B1 C1, C1 -> B2 C2, …, Ck−2 -> Bk−1 Bk. Si varios
 cuerpos comparten el mismo sufijo, se reutiliza la misma variable.
+
+convertir_a_cnf aplica todo en el orden de Hopcroft: ε → unitarias → inútiles
+→ (a) → (b), y guarda la gramática de cada paso para mostrar el paso a paso.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
+from algoritmos.eliminar_epsilon import calcular_anulables, eliminar_producciones_epsilon
+from algoritmos.eliminar_inutiles import (
+    calcular_simbolos_alcanzables,
+    calcular_simbolos_generadores,
+    eliminar_simbolos_no_alcanzables,
+    eliminar_simbolos_no_generadores,
+)
+from algoritmos.eliminar_unitarias import (
+    calcular_parejas_unitarias,
+    eliminar_producciones_unitarias,
+)
 from modelos.gramatica import Cuerpo, Gramatica
+
+TITULO_PASO_EPSILON = "Eliminar producciones ε"
+TITULO_PASO_UNITARIAS = "Eliminar producciones unitarias"
+TITULO_PASO_INUTILES = "Eliminar símbolos inútiles"
+TITULO_PASO_TERMINALES = "CNF (a): reemplazar terminales en cuerpos largos"
+TITULO_PASO_BINARIZAR = "CNF (b): binarizar cuerpos largos"
 
 NOMBRES_MNEMOTECNICOS: dict[str, str] = {"(": "L", ")": "R", "+": "P", "*": "M", "0": "Z", "1": "O"}
 """Nombres del libro para las variables de algunos terminales (L = left, R = right, P = plus...)."""
@@ -30,6 +52,42 @@ LETRAS_PARA_VARIABLES_NUEVAS = "ZYXWVUTSRQPONMLKJIHGFEDCBA"
 
 PREFIJO_VARIABLES_NUMERADAS = "C"
 """Prefijo de las variables nuevas cuando ya no quedan letras libres: C1, C2, …"""
+
+
+@dataclass
+class PasoConversion:
+    """Un paso de la conversión a CNF.
+
+    Atributos:
+        titulo: nombre del paso (ej. "Eliminar producciones ε").
+        gramatica: gramática que quedó después del paso.
+        detalles: información del paso para mostrarla; las claves dependen del paso
+            ("anulables", "parejas_unitarias", "no_generadores", "no_alcanzables",
+            "variables_por_terminal" o "variables_por_cuerpo").
+    """
+
+    titulo: str
+    gramatica: Gramatica
+    detalles: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass
+class ResultadoConversionCNF:
+    """Resultado completo de convertir una gramática a CNF.
+
+    Atributos:
+        gramatica_original: copia de la gramática recibida.
+        pasos: los 5 pasos, en orden.
+        gramatica_cnf: gramática final en CNF.
+        genera_cadena_vacia: True si ε pertenecía al lenguaje original (la CNF no puede generarla).
+        ya_estaba_en_cnf: True si la gramática original ya estaba en CNF.
+    """
+
+    gramatica_original: Gramatica
+    pasos: list[PasoConversion]
+    gramatica_cnf: Gramatica
+    genera_cadena_vacia: bool
+    ya_estaba_en_cnf: bool
 
 
 def obtener_producciones_fuera_de_cnf(gramatica: Gramatica) -> list[tuple[str, Cuerpo]]:
@@ -111,7 +169,9 @@ def generar_nombre_variable_para_terminal(terminal: str, nombres_usados: set[str
     return generar_nombre_variable_nueva(nombres_usados)
 
 
-def reemplazar_terminales_en_cuerpos_largos(gramatica: Gramatica) -> tuple[Gramatica, dict[str, str]]:
+def reemplazar_terminales_en_cuerpos_largos(
+    gramatica: Gramatica,
+) -> tuple[Gramatica, dict[str, str]]:
     """Construcción (a) de CNF: saca los terminales de los cuerpos de longitud ≥ 2.
 
     Se recorren las variables y sus cuerpos en orden. La primera vez que un
@@ -209,3 +269,95 @@ def _es_produccion_en_cnf(gramatica: Gramatica, cuerpo: Cuerpo) -> bool:
     if len(cuerpo) == 2:
         return all(gramatica.es_variable(simbolo) for simbolo in cuerpo)
     return False
+
+
+def convertir_a_cnf(gramatica: Gramatica) -> ResultadoConversionCNF:
+    """Convierte cualquier gramática libre de contexto a CNF, guardando cada paso.
+
+    Orden de Hopcroft: (1) eliminar ε, (2) eliminar unitarias, (3) eliminar
+    inútiles, (4) construcción (a) y (5) construcción (b). En la gramática final
+    van primero las variables que quedaron después del paso 3, luego las nuevas
+    de (b) y al final las nuevas de (a); con ese orden, 1.txt produce
+    exactamente 1-cnf.txt.
+
+    Parámetros:
+        gramatica: gramática a convertir (no se modifica).
+
+    Retorna:
+        El resultado con la gramática original, los 5 pasos y la gramática en CNF.
+    """
+    gramatica_original = gramatica.copiar()
+
+    anulables = calcular_anulables(gramatica_original)
+    gramatica_sin_epsilon = eliminar_producciones_epsilon(gramatica_original)
+
+    parejas_unitarias = calcular_parejas_unitarias(gramatica_sin_epsilon)
+    gramatica_sin_unitarias = eliminar_producciones_unitarias(gramatica_sin_epsilon)
+
+    # El paso 3 se hace en sus dos mitades para poder informar qué se eliminó.
+    generadores = calcular_simbolos_generadores(gramatica_sin_unitarias)
+    no_generadores = {
+        variable for variable in gramatica_sin_unitarias.variables if variable not in generadores
+    }
+    gramatica_solo_generadores = eliminar_simbolos_no_generadores(gramatica_sin_unitarias)
+    simbolos_antes_de_alcanzar = set(gramatica_solo_generadores.variables) | set(
+        gramatica_solo_generadores.terminales
+    )
+    no_alcanzables = simbolos_antes_de_alcanzar - calcular_simbolos_alcanzables(
+        gramatica_solo_generadores
+    )
+    gramatica_sin_inutiles = eliminar_simbolos_no_alcanzables(gramatica_solo_generadores)
+
+    gramatica_sin_terminales_en_cuerpos_largos, variable_por_terminal = (
+        reemplazar_terminales_en_cuerpos_largos(gramatica_sin_inutiles)
+    )
+    gramatica_binarizada, variable_por_sufijo = binarizar_cuerpos_largos(
+        gramatica_sin_terminales_en_cuerpos_largos
+    )
+    orden_final_de_variables = (
+        gramatica_sin_inutiles.variables
+        + list(variable_por_sufijo.values())
+        + list(variable_por_terminal.values())
+    )
+    gramatica_cnf = _reordenar_variables(gramatica_binarizada, orden_final_de_variables)
+
+    pasos = [
+        PasoConversion(TITULO_PASO_EPSILON, gramatica_sin_epsilon, {"anulables": anulables}),
+        PasoConversion(
+            TITULO_PASO_UNITARIAS,
+            gramatica_sin_unitarias,
+            {"parejas_unitarias": parejas_unitarias},
+        ),
+        PasoConversion(
+            TITULO_PASO_INUTILES,
+            gramatica_sin_inutiles,
+            {"no_generadores": no_generadores, "no_alcanzables": no_alcanzables},
+        ),
+        PasoConversion(
+            TITULO_PASO_TERMINALES,
+            gramatica_sin_terminales_en_cuerpos_largos,
+            {"variables_por_terminal": variable_por_terminal},
+        ),
+        PasoConversion(
+            TITULO_PASO_BINARIZAR, gramatica_cnf, {"variables_por_cuerpo": variable_por_sufijo}
+        ),
+    ]
+    return ResultadoConversionCNF(
+        gramatica_original=gramatica_original,
+        pasos=pasos,
+        gramatica_cnf=gramatica_cnf,
+        genera_cadena_vacia=gramatica_original.simbolo_inicial in anulables,
+        ya_estaba_en_cnf=es_forma_normal_chomsky(gramatica_original),
+    )
+
+
+def _reordenar_variables(gramatica: Gramatica, orden_de_variables: list[str]) -> Gramatica:
+    """Copia la gramática con las variables en el orden indicado (las que falten van al final)."""
+    gramatica_reordenada = Gramatica(gramatica.simbolo_inicial)
+    for variable in dict.fromkeys(orden_de_variables + gramatica.variables):
+        if not gramatica.es_variable(variable):
+            continue
+        gramatica_reordenada.agregar_variable(variable)
+        for cuerpo in gramatica.obtener_producciones(variable):
+            gramatica_reordenada.agregar_produccion(variable, cuerpo)
+    return gramatica_reordenada
