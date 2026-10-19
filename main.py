@@ -1,12 +1,16 @@
 """Punto de entrada del proyecto (consola).
 
 Lee una gramática libre de contexto, la simplifica y la convierte a Forma
-Normal de Chomsky (CNF) mostrando el paso a paso.
+Normal de Chomsky (CNF) mostrando el paso a paso. Después valida frases con el
+algoritmo CYK: responde SÍ/NO, mide el tiempo de validación y muestra la tabla
+de programación dinámica y el parse tree (en consola y como imagen con Graphviz).
 
 Uso:
-    python main.py                                    # gramática del inglés
-    python main.py -g gramaticas/1.txt                # otra gramática
-    python main.py -g gramaticas/1.txt --sin-pasos    # solo la gramática original y la CNF
+    python main.py                                         # gramática del inglés, modo interactivo
+    python main.py -f "She eats a cake with a fork"        # validar una frase y terminar
+    python main.py -g gramaticas/1.txt -f "(id*id)+id"     # CYK sobre otra gramática
+    python main.py -f "he cooks" --repeticiones 1000       # tiempo promedio de CYK
+    python main.py -g gramaticas/1.txt --sin-pasos         # solo la gramática original y la CNF
     python main.py -g gramaticas/1.txt --guardar-cnf salidas/1-cnf.txt
 """
 
@@ -47,8 +51,10 @@ def construir_analizador_argumentos() -> argparse.ArgumentParser:
     analizador = argparse.ArgumentParser(
         prog="main.py",
         description=(
-            "Simplifica una gramática libre de contexto y la convierte a "
-            "Forma Normal de Chomsky (CNF), mostrando el paso a paso."
+            "Simplifica una gramática libre de contexto, la convierte a Forma Normal "
+            "de Chomsky (CNF) mostrando el paso a paso y valida frases con el algoritmo "
+            "CYK: responde SÍ/NO, mide el tiempo y construye el parse tree. Sin -f, "
+            "pide frases en modo interactivo hasta escribir 'salir'."
         ),
     )
     analizador.add_argument(
