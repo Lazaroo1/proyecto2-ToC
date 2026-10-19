@@ -1,9 +1,11 @@
 """Reconocimiento de cadenas en CNF mediante programación dinámica."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from algoritmos.forma_normal_chomsky import es_forma_normal_chomsky
 from modelos.gramatica import Gramatica
+
+Retroceso = str | tuple[int, str, str]
 
 
 @dataclass
@@ -13,6 +15,7 @@ class ResultadoCYK:
     tokens: list[str]
     tabla: list[list[set[str]]]
     acepta: bool
+    retroceso: dict[tuple[int, int, str], Retroceso] = field(default_factory=dict)
 
 
 def cyk(gramatica_cnf: Gramatica, tokens: list[str],
@@ -36,11 +39,14 @@ def cyk(gramatica_cnf: Gramatica, tokens: list[str],
             else:
                 producciones_binarias.append((cabeza, *cuerpo))
     cantidad_tokens = len(tokens)
+    retroceso: dict[tuple[int, int, str], Retroceso] = {}
     tabla = [[set() for columna in tokens] for fila in tokens]
     if not tokens:
         return ResultadoCYK(list(tokens), tabla, genera_cadena_vacia)
     for posicion, token in enumerate(tokens):
         tabla[posicion][posicion].update(variables_por_terminal.get(token, []))
+        for cabeza in variables_por_terminal.get(token, []):
+            retroceso.setdefault((posicion, posicion, cabeza), token)
     for longitud in range(2, cantidad_tokens + 1):
         for inicio in range(cantidad_tokens - longitud + 1):
             fin = inicio + longitud - 1
@@ -48,5 +54,6 @@ def cyk(gramatica_cnf: Gramatica, tokens: list[str],
                 for cabeza, izquierda, derecha in producciones_binarias:
                     if izquierda in tabla[inicio][corte] and derecha in tabla[corte + 1][fin]:
                         tabla[inicio][fin].add(cabeza)
+                        retroceso.setdefault((inicio, fin, cabeza), (corte, izquierda, derecha))
     acepta = gramatica_cnf.simbolo_inicial in tabla[0][cantidad_tokens - 1]
-    return ResultadoCYK(list(tokens), tabla, acepta)
+    return ResultadoCYK(list(tokens), tabla, acepta, retroceso)

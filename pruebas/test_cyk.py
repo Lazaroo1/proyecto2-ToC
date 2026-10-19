@@ -53,6 +53,27 @@ class PruebaCYK(unittest.TestCase):
         resultado = cyk(gramatica, ["he", "cooks"])
         self.assertEqual(resultado.tabla, [[{"NP"}, {"S"}], [set(), {"VP", "V"}]])
 
+    def test_retroceso_completo_consistente_y_determinista(self) -> None:
+        gramatica = leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "ingles.txt")
+        tokens = tokenizar_frase(FRASES_INGLES_SI[0], gramatica.terminales)
+        resultado = cyk(gramatica, tokens)
+        self.assertEqual(resultado.retroceso[(0, 6, "S")], (0, "NP", "VP"))
+        self.assertEqual(resultado.retroceso, cyk(gramatica, tokens).retroceso)
+        for inicio, fila in enumerate(resultado.tabla):
+            for fin, celda in enumerate(fila):
+                for cabeza in celda:
+                    origen = resultado.retroceso[(inicio, fin, cabeza)]
+                    if isinstance(origen, str):
+                        self.assertEqual(inicio, fin)
+                        self.assertEqual(origen, tokens[inicio])
+                        self.assertIn((origen,), gramatica.obtener_producciones(cabeza))
+                    else:
+                        corte, izquierda, derecha = origen
+                        self.assertTrue(inicio <= corte < fin)
+                        self.assertIn(izquierda, resultado.tabla[inicio][corte])
+                        self.assertIn(derecha, resultado.tabla[corte + 1][fin])
+                        self.assertIn((izquierda, derecha), gramatica.obtener_producciones(cabeza))
+
     def test_vacia_y_gramatica_fuera_de_cnf(self) -> None:
         original = leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "1.txt")
         with self.assertRaises(ValueError):
