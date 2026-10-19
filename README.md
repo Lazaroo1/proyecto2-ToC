@@ -4,6 +4,10 @@ Proyecto 2 del curso **Teoría de la Computación**.
 
 El programa recibe una gramática libre de contexto (que puede estar o no en Forma Normal de Chomsky), la simplifica y la convierte a **CNF**. Después usa el algoritmo **CYK** (programación dinámica) para decidir si una frase pertenece al lenguaje: responde **SÍ** o **NO**, indica el **tiempo** que tardó la validación y construye el **parse tree** de la frase.
 
+## Video
+
+Video del proyecto en YouTube: <https://youtu.be/UJFoDGpd3jo>
+
 ## Integrantes
 
 | Integrante | Carnet |
