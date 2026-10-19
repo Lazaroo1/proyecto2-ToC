@@ -15,6 +15,29 @@ El programa recibe una gramática libre de contexto (que puede estar o no en For
 
 - Python 3.10 o superior (solo la biblioteca estándar).
 
+## Uso
+
+Desde la raíz del proyecto:
+
+```bash
+python main.py                                     # paso a paso con la gramática del inglés (por defecto)
+python main.py -g gramaticas/1.txt                 # paso a paso de la conversión a CNF de otra gramática
+python main.py -g gramaticas/1.txt --sin-pasos     # solo la gramática original y la CNF final
+python main.py -g gramaticas/1.txt --guardar-cnf salidas/1-cnf.txt   # exportar la CNF a un archivo
+```
+
+El programa muestra cada paso de la simplificación (anulables, parejas unitarias, símbolos inútiles, variables nuevas) y el tiempo que tardó la conversión. Con `1.txt`, la CNF que se obtiene es idéntica a `1-cnf.txt`.
+
+## Pruebas
+
+```bash
+python -m unittest discover -s pruebas -t . -v
+```
+
+## Documentación
+
+El diseño, la discusión y los ejemplos están en [`docs/reporte.md`](docs/reporte.md).
+
 ## Formato de las gramáticas
 
 Las gramáticas se escriben en archivos `.txt` dentro de [`gramaticas/`](gramaticas/):
