@@ -429,7 +429,114 @@ sequenceDiagram
 
 ## 2. Discusión
 
-<!-- pendiente -->
+### 2.1 Obstáculos y decisiones
+
+**Orden de simplificación.** Eliminar ε puede introducir producciones unitarias;
+eliminar unitarias puede dejar variables inútiles. Por eso se aplica ε →
+unitarias → inútiles antes de convertir a CNF. Dentro del tercer paso se quitan
+primero los no generadores: al borrar sus producciones pueden quedar símbolos
+inalcanzables que no se habrían detectado si se hiciera al revés.
+
+**Coincidencia exacta con `1-cnf.txt`.** No basta con reconocer el mismo lenguaje
+si se quiere reproducir el ejemplo del catedrático. Se fijaron nombres
+mnemotécnicos para terminales, nombres libres desde Z para binarización,
+reutilización de sufijos y orden final de variables. Una prueba compara el
+texto completo, además de las pruebas de equivalencia de reconocimiento.
+
+**Cadena vacía.** La variante estricta de CNF usada aquí excluye ε. Se calcula
+si el inicial era anulable antes de eliminar producciones vacías y se transporta
+esa información mediante `genera_cadena_vacia`. Así `anbn.txt` acepta ε aunque
+su CNF no tenga un cuerpo vacío. El archivo de CNF exportado no almacena la
+bandera: al cargarlo de nuevo por sí solo no recupera la aceptación de ε.
+
+**Inglés ya en CNF.** La gramática principal no necesita transformaciones, pero
+se muestran los cinco pasos y se señalan como sin cambios. La gramática de
+expresiones permite demostrar las transformaciones que sí exige el proyecto.
+
+**Tokenización.** Separar únicamente por espacios no resuelve `(id*id)+id`;
+segmentar cualquier palabra aceptaría accidentalmente `athe` como `a the`.
+Se combinan reconocimiento completo, segmentación condicionada y limpieza
+de puntuación. `The cat drinks the beer.` conserva su significado sintáctico
+tras normalizar mayúsculas y punto final.
+
+**Sintaxis, semántica y ambigüedad.** `the fork eats the cat` pertenece al lenguaje
+aunque describa algo absurdo. CYK solo verifica las producciones. Por otra
+parte, una frase puede tener varias estructuras válidas: `id+id*id` tiene dos
+árboles en `ambigua.txt`. El conteo informa esa diferencia y el retroceso
+determinista elige una estructura para mostrar.
+
+**Árbol sobre CNF.** La conversión introduce variables como Z, L y R. Se muestran
+porque son parte de las producciones usadas por CYK; reconstruir la gramática
+original requeriría guardar la procedencia de cada transformación.
+
+**Determinismo y UTF-8.** Las celdas de CYK son conjuntos, pero el retroceso se
+decide recorriendo producciones ordenadas y las celdas se imprimen en el orden
+de las variables. En Windows se configura UTF-8 para mostrar ε y las ramas del
+árbol, se leen archivos con soporte para BOM y se captura la salida de las
+pruebas con codificación explícita.
+
+**Graphviz en Windows.** El ejecutable puede estar instalado sin aparecer en
+PATH. Se comprueba también `Program Files` y `Program Files (x86)`. En la
+validación se utilizó la instalación disponible y se generaron los tres PNG
+del reporte. Una prueba simula su ausencia y verifica que se conserve DOT;
+el reconocimiento y el árbol en texto funcionan sin esa herramienta.
+
+**Recursión por la izquierda.** CYK combina intervalos de longitud creciente,
+por lo que no necesita eliminarla. `expresiones_recursiva.txt` y `VP -> VP PP`
+se manejan sin un descenso recursivo sobre producciones. La transformación de
+recursión izquierda del PDF explica el origen de `1.txt`, pero no constituye
+otro paso requerido por nuestra conversión a CNF.
+
+### 2.2 Recomendaciones
+
+Conviene definir primero la representación de ε y el criterio para distinguir
+variables de terminales. Los ejemplos de cada paso deben probarse por separado
+antes de conectarlos con CYK. Conservar las gramáticas intermedias permite
+localizar el paso que introduce una diferencia.
+
+Además de probar frases conocidas, es útil comparar contra un reconocedor que
+no reutilice el mismo algoritmo. Las enumeraciones de este proyecto detectan
+aceptaciones y rechazos erróneos; las derivaciones aleatorias comprueban cadenas
+más variadas. Las semillas fijas permiten reproducir cualquier fallo.
+
+Para evaluar rendimiento, debe medirse solo el algoritmo y repetir la llamada;
+la impresión o Graphviz podrían dominar el tiempo total. Para entregar, se debe
+probar tanto el modo interactivo como `-f`, comprobar los mensajes de error y
+verificar los enlaces e imágenes de la documentación.
+
+### 2.3 Limitaciones y posibles mejoras
+
+El árbol y el conteo corresponden a la CNF. Una mejora sería conservar metadatos
+de las transformaciones para reconstruir árboles de la gramática original.
+También se podrían comparar otros reconocedores, como Earley, que permiten
+trabajar directamente con una CFG.
+
+Un bosque sintáctico compartido permitiría explorar todos los árboles de una
+frase ambigua sin materializarlos inmediatamente. Una interfaz gráfica podría
+mostrar la construcción de cada celda y sus cortes. Para frases muy largas
+habría que considerar el coste cúbico, los enteros grandes del conteo y la
+profundidad recursiva de la reconstrucción y visualización. Ninguna de esas
+ampliaciones es necesaria para los ejemplos de esta entrega.
+
+### 2.4 Distribución del trabajo
+
+| Integrante | Commits del plan | Responsabilidades |
+|---|---|---|
+| Lázaro Díaz — 24713 | 1–15 y 15b: 16 commits | Estructura, modelo de gramática, lectura y escritura, simplificación, CNF, consola del paso a paso y documentación de diseño. |
+| Jorge Villeda — 24932 | 16–30 y 23b: 16 commits | Tokenizador, CYK, retroceso, árbol, Graphviz, tabla, consola de frases, medición del tiempo, conteo, pruebas de integración y propiedades, ejemplos, discusión y documentación final. |
+
+### 2.5 Conclusiones
+
+La aplicación integra la conversión de CFG a CNF con reconocimiento mediante
+programación dinámica. La separación entre algoritmos y entrada/salida permite
+verificar cada etapa sin depender de la consola o Graphviz. La conversión de
+`1.txt` reproduce exactamente la referencia y las pruebas independientes no
+encontraron diferencias en los conjuntos examinados.
+
+Guardar el retroceso permite explicar una aceptación mediante un árbol y no
+solo mediante un resultado booleano. El conteo complementa esa explicación al
+detectar frases ambiguas. Los resultados se limitan a corrección sintáctica
+respecto a la gramática; no pretenden evaluar el significado de una oración.
 
 ## 3. Ejemplos y pruebas realizadas
 
