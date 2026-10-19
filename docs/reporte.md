@@ -20,9 +20,9 @@ El método de modelado es **por capas**: los algoritmos están separados de todo
 ```mermaid
 flowchart TD
     MAIN["main.py<br/>consola: argumentos, tiempo e impresión"]
-    ES["entrada_salida/<br/>lector, escritor y formato del paso a paso"]
-    ALG["algoritmos/<br/>ε, unitarias, inútiles y CNF (funciones puras)"]
-    MOD["modelos/<br/>Gramatica"]
+    ES["entrada_salida/<br/>lectura, formato, tokenización y visualización"]
+    ALG["algoritmos/<br/>simplificación, CNF y CYK (funciones puras)"]
+    MOD["modelos/<br/>Gramatica y NodoArbol"]
     ARCH[("gramaticas/*.txt")]
     MAIN --> ES
     MAIN --> ALG
@@ -45,6 +45,11 @@ Las dependencias van en una sola dirección: `main.py` → `entrada_salida/` →
 | `algoritmos/forma_normal_chomsky.py` | Validación de CNF, pasos 4 y 5 (construcciones (a) y (b)) y la conversión completa `convertir_a_cnf`. |
 | `entrada_salida/formato_pasos.py` | Texto del paso a paso de la conversión (como el ejemplo del catedrático). |
 | `main.py` | Argumentos de la consola, medición del tiempo, impresión y manejo de errores. |
+| `entrada_salida/tokenizador.py` | Normaliza y segmenta la frase según el vocabulario. |
+| `algoritmos/cyk.py` | Reconoce, guarda retrocesos, reconstruye el árbol y cuenta derivaciones. |
+| `modelos/nodo_arbol.py` | Símbolo e hijos ordenados; hojas, altura y cantidad de nodos. |
+| `entrada_salida/formato_cyk.py` | Tabla triangular, decisión y tiempos. |
+| `entrada_salida/visualizacion_arbol.py` | Árbol en texto, corchetes, DOT e imagen con Graphviz. |
 
 ### 1.2 Flujo general
 
@@ -57,9 +62,14 @@ flowchart LR
     E --> F["Paso 4<br/>CNF (a): terminales"]
     F --> G["Paso 5<br/>CNF (b): binarizar"]
     G --> H["Gramática en CNF"]
+    H --> I["Tokenizar la frase"]
+    W["Frase del usuario"] --> I
+    I --> J["CYK y retroceso"]
+    J --> K["SÍ/NO + tiempo + tabla"]
+    J --> L{"¿Aceptada?"}
+    L -->|Sí| M["Árbol y conteo de derivaciones"]
+    M --> N["Consola + corchetes + DOT/PNG"]
 ```
-
-<!-- pendiente: Jorge — completar el flujo con: tokenizar → CYK → SÍ/NO + tiempo + tabla + parse tree + imagen -->
 
 Cada paso devuelve una gramática **nueva** (nunca se modifica la anterior), por lo que el programa puede mostrar todas las gramáticas intermedias.
 
@@ -263,19 +273,159 @@ Esto también lo verifica automáticamente la prueba `test_gramatica_uno_da_exac
 
 ### 1.7 Tokenización de la frase
 
-<!-- pendiente: Jorge -->
+`tokenizar_frase` procesa los fragmentos separados por espacios. Primero busca
+el fragmento completo como terminal, tanto tal cual como en minúsculas. Si no
+lo encuentra y contiene símbolos no alfanuméricos, o todos los terminales son
+de un carácter, intenta segmentarlo por completo usando programación dinámica.
+Prueba primero los terminales más largos, pero conserva una solución para cada
+sufijo: una elección larga que deja un sufijo imposible no impide encontrar otra.
+
+Si sigue sin reconocerlo, quita puntuación de los extremos y repite esas dos
+operaciones. Un fragmento vacío se ignora; uno desconocido se conserva en
+minúsculas. `encontrar_tokens_desconocidos` informa esas palabras sin duplicados.
+Así `The cat drinks the beer.` se normaliza, `(id*id)+id` se segmenta y `aabb`
+se convierte en cuatro tokens en la gramática aⁿbⁿ. Una palabra alfanumérica
+como `athe` o `idid` no se divide cuando hay terminales largos: evita aceptar
+errores ortográficos como una concatenación accidental de palabras válidas.
 
 ### 1.8 Algoritmo CYK
 
-<!-- pendiente: Jorge -->
+La programación dinámica guarda soluciones de subproblemas solapados para
+reutilizarlas. Aquí se resuelve pertenencia, no una optimización numérica:
+la propiedad de descomposición que cumple el papel de subestructura óptima
+consiste en que una derivación `A -> B C` existe exactamente cuando existen
+las dos subderivaciones correspondientes a algún corte.
+
+`X[inicio][fin]` es el conjunto de variables que derivan los tokens del intervalo
+inclusivo. La base agrega A cuando existe `A -> tokens[posicion]`. Para cada
+longitud mayor, se consideran todos los cortes y producciones binarias:
+
+```text
+X[posicion][posicion] = {A : A -> tokens[posicion]}
+para longitud = 2 hasta cantidad_tokens:
+    para inicio = 0 hasta cantidad_tokens - longitud:
+        fin = inicio + longitud - 1
+        para corte = inicio hasta fin - 1:
+            para cada A -> B C en orden de la gramática:
+                si B pertenece a X[inicio][corte] y C a X[corte + 1][fin]:
+                    agregar A a X[inicio][fin]
+acepta = simbolo_inicial pertenece a X[0][cantidad_tokens - 1]
+```
+
+El orden por longitud garantiza que ambas subcadenas ya están resueltas. Con
+n tokens, |R| producciones y |V| variables, el tiempo es O(n³·|R|) y la memoria
+de la tabla y el retroceso es O(n²·|V|). Las producciones se clasifican una vez
+por llamada. La validación de CNF ocurre antes del caso vacío y rechaza con
+`ValueError` cualquier gramática sin convertir. Con cero tokens la tabla es
+vacía y la decisión viene de `genera_cadena_vacia`.
+
+Tabla real para `She eats a cake with a fork`:
+
+```text
+Tabla CYK (fila = longitud de la subcadena, columna = posición inicial):
+7 │ {S}
+6 │ ∅        {VP}
+5 │ ∅        ∅        ∅
+4 │ {S}      ∅        ∅        ∅
+3 │ ∅        {VP}     ∅        ∅        {PP}
+2 │ {S}      ∅        {NP}     ∅        ∅        {NP}
+1 │ {NP}     {VP, V}  {Det}    {N}      {P}      {Det}    {N}
+  │ she      eats     a        cake     with     a        fork
+```
+
+La celda superior contiene S, por lo que la frase pertenece al lenguaje.
 
 ### 1.9 Construcción del parse tree
 
-<!-- pendiente: Jorge -->
+`ResultadoCYK.retroceso` extiende la tabla guardando la procedencia de cada
+variable. Su clave es `(inicio, fin, variable)`; el valor es un token para una
+producción terminal, o `(corte, izquierda, derecha)` para una binaria. Se usa
+`setdefault` para conservar la primera derivación encontrada, recorriendo
+los cortes y las producciones en un orden fijo.
+
+En el ejemplo, `retroceso[(0, 6, "S")] = (0, "NP", "VP")`: la raíz S tiene
+un NP que cubre `she` y un VP que cubre las seis palabras restantes.
+`construir_arbol_sintactico` sigue estas referencias recursivamente y crea
+`NodoArbol`. Una frase rechazada devuelve `None`. Para ε aceptada crea
+`NodoArbol("S", [NodoArbol("ε")])`; esa hoja representa la cadena de cero tokens.
+En frases no vacías, las hojas coinciden con los tokens de izquierda a derecha.
+La altura de una hoja es cero; el árbol de `he cooks` tiene cinco nodos y altura dos.
+
+El árbol corresponde a la **gramática en CNF**. Las variables auxiliares de
+la conversión aparecen explícitamente, como L, R y Z en las expresiones.
 
 ### 1.10 Medición del tiempo
 
-<!-- pendiente: Jorge -->
+`main.py` llama a `time.perf_counter()` inmediatamente antes y después de
+`cyk()`. Este reloj mide intervalos con alta resolución. Se incluyen la
+validación de CNF, los precálculos, la tabla y el retroceso que realiza esa
+llamada; se excluyen lectura, conversión, tokenización, conteo de árboles,
+reconstrucción, impresión y Graphviz. El tiempo de conversión se informa aparte.
+
+Con `--repeticiones N` se repite CYK N veces, se calcula el promedio y se informa
+también el mínimo. Una frase corta tarda muy poco y una sola medición es
+sensible a la planificación del sistema. Los tiempos se muestran en
+milisegundos con cuatro decimales; N debe ser un entero mayor o igual a uno.
+
+### 1.11 Conteo de árboles y ambigüedad
+
+`contar_arboles_de_derivacion` usa otra tabla, donde cada celda asocia una
+variable con su cantidad de árboles. La base cuenta producciones terminales;
+para cada `A -> B C` y cada corte suma el producto de los conteos izquierdo y
+derecho. Las alternativas se suman porque son árboles diferentes; las ramas
+se multiplican porque sus elecciones son independientes.
+
+Más de un árbol demuestra ambigüedad de esa frase en la CNF. El programa muestra
+el conteo y conserva el primer árbol para visualizarlo. No se almacenan todos
+los árboles. El conteo es sobre la CNF: la simplificación puede fusionar
+derivaciones de la gramática original. Para ε se usa la convención 1 si se
+acepta y 0 si se rechaza, sin contar posibles ciclos de derivación vacía.
+El número de operaciones sigue O(n³·|R|), aunque el coste de operar enteros
+crece con la cantidad de dígitos cuando hay muchos árboles.
+
+### 1.12 Visualización
+
+`arbol_a_texto` dibuja ramas con `├──` y `└──`; `arbol_a_corchetes` produce una
+representación compacta. `arbol_a_dot` asigna identificadores en preorden,
+escapa etiquetas y usa `ordering="out"` para conservar el orden de los hijos.
+Los nodos internos son elipses y las hojas son cajas de distinto color.
+
+`exportar_arbol_imagen` siempre guarda el `.dot` y ejecuta Graphviz cuando
+`buscar_ejecutable_dot` lo encuentra en PATH o en las rutas comunes de Windows.
+Sin Graphviz se conserva DOT y se informa su ruta. `--sin-imagen` omite ambos
+archivos; `--salida CARPETA` permite elegir dónde guardarlos.
+
+### 1.13 Secuencia para una frase
+
+```mermaid
+sequenceDiagram
+    actor Usuario
+    participant Principal as main.py
+    participant Entrada as entrada_salida
+    participant Conversion as convertir_a_cnf
+    participant Reconocedor as cyk
+    participant Arbol as construir_arbol_sintactico
+    Usuario->>Principal: Gramática y frase
+    Principal->>Entrada: Leer archivo
+    Entrada-->>Principal: Gramatica
+    Principal->>Conversion: Convertir y medir conversión
+    Conversion-->>Principal: CNF, pasos y bandera de ε
+    Principal->>Entrada: Tokenizar frase
+    Entrada-->>Principal: Tokens
+    loop N repeticiones
+        Principal->>Reconocedor: Medir llamada con perf_counter
+        Reconocedor-->>Principal: Decisión, tabla y retroceso
+    end
+    Principal->>Usuario: SÍ/NO, tiempo y tabla
+    alt Frase aceptada
+        Principal->>Arbol: Reconstruir desde el retroceso
+        Arbol-->>Principal: NodoArbol
+        Principal->>Reconocedor: Contar árboles con la función de conteo
+        Reconocedor-->>Principal: Cantidad
+        Principal->>Entrada: Formatear árbol y exportar si corresponde
+        Entrada-->>Usuario: Texto, corchetes y rutas DOT/PNG
+    end
+```
 
 ## 2. Discusión
 
