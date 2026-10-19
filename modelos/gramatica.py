@@ -23,7 +23,7 @@ class Gramatica:
     """
 
     def __init__(self, simbolo_inicial: str) -> None:
-        """Crea una gramática vacía cuyo primer variable es el símbolo inicial.
+        """Crea una gramática vacía cuya primera variable es el símbolo inicial.
 
         Parámetros:
             simbolo_inicial: nombre de la variable inicial.
