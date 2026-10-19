@@ -38,3 +38,14 @@ def formatear_resultado(frase: str, tokens: list[str], tokens_desconocidos: list
     decision = "SÍ — la frase pertenece" if acepta else "NO — la frase no pertenece"
     lineas.append(f"Resultado: {decision} al lenguaje de la gramática.")
     return "\n".join(lineas)
+
+
+def formatear_tiempo(tiempo_promedio_milisegundos: float, repeticiones: int = 1,
+                     tiempo_minimo_milisegundos: float | None = None) -> str:
+    """Formatea el tiempo CYK con cuatro decimales y estadísticas opcionales."""
+    texto = f"Tiempo de validación (CYK): {tiempo_promedio_milisegundos:.4f} ms"
+    if repeticiones > 1:
+        minimo = (tiempo_promedio_milisegundos if tiempo_minimo_milisegundos is None
+                  else tiempo_minimo_milisegundos)
+        texto += f" (promedio de {repeticiones} ejecuciones; mínimo: {minimo:.4f} ms)"
+    return texto

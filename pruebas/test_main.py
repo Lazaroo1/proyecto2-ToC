@@ -102,6 +102,16 @@ class PruebaConversionDesdeLaConsola(unittest.TestCase):
         self.assertIn("Resultado: SÍ", ejecucion.stdout)
         self.assertEqual(ejecucion.stdout.count("GRAMÁTICA ORIGINAL"), 1)
 
+    def test_tiempo_y_repeticiones(self) -> None:
+        ejecucion = ejecutar_programa("-f", "She eats a cake with a fork", "--sin-imagen")
+        self.assertRegex(ejecucion.stdout, r"Tiempo de validación \(CYK\): \d+\.\d{4} ms")
+        ejecucion = ejecutar_programa("-f", "he cooks", "--repeticiones", "50", "--sin-imagen")
+        self.assertEqual(ejecucion.returncode, 0, ejecucion.stderr)
+        self.assertIn("promedio de 50 ejecuciones", ejecucion.stdout)
+        ejecucion = ejecutar_programa("--repeticiones", "0")
+        self.assertEqual(ejecucion.returncode, 2)
+        self.assertIn("mayor o igual a 1", ejecucion.stderr)
+
     def test_interrupcion_y_opciones(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), patch("builtins.input", side_effect=KeyboardInterrupt):
             self.assertEqual(main.main(["--sin-imagen"]), 0)

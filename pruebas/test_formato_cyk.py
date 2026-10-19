@@ -3,7 +3,7 @@
 import unittest
 
 from algoritmos.cyk import cyk
-from entrada_salida.formato_cyk import formatear_resultado, tabla_cyk_a_texto
+from entrada_salida.formato_cyk import formatear_resultado, formatear_tiempo, tabla_cyk_a_texto
 from entrada_salida.lector_gramatica import leer_gramatica_desde_archivo
 from pruebas.test_cyk import RUTA_GRAMATICAS
 
@@ -29,6 +29,12 @@ class PruebaFormatoCYK(unittest.TestCase):
                          "Frase: pizza\nTokens (1): pizza\n"
                          "Aviso: estas palabras no son terminales de la gramática: pizza\n"
                          "Resultado: NO — la frase no pertenece al lenguaje de la gramática.")
+
+    def test_tiempos_exactos(self) -> None:
+        self.assertEqual(formatear_tiempo(1.5), "Tiempo de validación (CYK): 1.5000 ms")
+        self.assertEqual(formatear_tiempo(0.05, 100, 0.04),
+                         "Tiempo de validación (CYK): 0.0500 ms "
+                         "(promedio de 100 ejecuciones; mínimo: 0.0400 ms)")
 
     def test_tablas_exactas(self) -> None:
         gramatica = leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "ingles.txt")

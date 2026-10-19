@@ -24,7 +24,7 @@ from algoritmos.cyk import construir_arbol_sintactico, cyk
 from entrada_salida.escritor_gramatica import guardar_gramatica_en_archivo
 from entrada_salida.formato_pasos import formatear_conversion, formatear_gramatica_con_titulo
 from entrada_salida.lector_gramatica import ErrorFormatoGramatica, leer_gramatica_desde_archivo
-from entrada_salida.formato_cyk import formatear_resultado, tabla_cyk_a_texto
+from entrada_salida.formato_cyk import formatear_resultado, formatear_tiempo, tabla_cyk_a_texto
 from entrada_salida.tokenizador import encontrar_tokens_desconocidos, tokenizar_frase
 from entrada_salida.visualizacion_arbol import (
     arbol_a_corchetes, arbol_a_texto, exportar_arbol_imagen,
@@ -75,6 +75,8 @@ def construir_analizador_argumentos() -> argparse.ArgumentParser:
     analizador.add_argument("--sin-imagen", action="store_true", help="omitir la exportación del árbol")
     analizador.add_argument("--salida", type=Path, default=CARPETA_DEL_PROYECTO / "salidas",
                             metavar="CARPETA", help="carpeta para los árboles exportados")
+    analizador.add_argument("--repeticiones", type=int, default=1, metavar="N",
+                            help="cantidad positiva de ejecuciones de CYK para medir su tiempo")
     return analizador
 
 
@@ -121,9 +123,15 @@ def analizar_frase(frase: str, conversion: ResultadoConversionCNF,
     """Tokeniza, reconoce y presenta la tabla y el árbol de una frase."""
     gramatica = conversion.gramatica_cnf
     tokens = tokenizar_frase(frase, gramatica.terminales)
-    resultado = cyk(gramatica, tokens, conversion.genera_cadena_vacia)
+    tiempos: list[float] = []
+    for repeticion in range(argumentos.repeticiones):
+        instante_inicial = time.perf_counter()
+        resultado = cyk(gramatica, tokens, conversion.genera_cadena_vacia)
+        instante_final = time.perf_counter()
+        tiempos.append((instante_final - instante_inicial) * MILISEGUNDOS_POR_SEGUNDO)
     desconocidos = encontrar_tokens_desconocidos(tokens, gramatica.terminales)
     print(formatear_resultado(frase, tokens, desconocidos, resultado.acepta))
+    print(formatear_tiempo(sum(tiempos) / len(tiempos), len(tiempos), min(tiempos)))
     if not argumentos.sin_tabla:
         print(tabla_cyk_a_texto(resultado, gramatica.variables))
     arbol = construir_arbol_sintactico(resultado, gramatica.simbolo_inicial)
@@ -158,7 +166,10 @@ def main(argumentos_linea: list[str] | None = None) -> int:
         El código de salida: 0 si todo salió bien, 1 si hubo un error con la gramática.
     """
     configurar_consola_utf8()
-    argumentos = construir_analizador_argumentos().parse_args(argumentos_linea)
+    analizador = construir_analizador_argumentos()
+    argumentos = analizador.parse_args(argumentos_linea)
+    if argumentos.repeticiones < 1:
+        analizador.error("--repeticiones debe ser un entero mayor o igual a 1")
     ruta_legible = obtener_ruta_legible(argumentos.gramatica)
 
     try:
