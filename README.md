@@ -8,7 +8,7 @@ El programa recibe una gramática libre de contexto (que puede estar o no en For
 
 | Integrante | Carnet |
 |---|---|
-| Lázaro ([@Lazaroo1](https://github.com/Lazaroo1)) | _por agregar_ |
+| Lázaro Díaz | 24713 |
 | Jorge Villeda | 24932 |
 
 ## Requisitos

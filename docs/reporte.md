@@ -4,7 +4,7 @@
 
 **Integrantes:**
 
-- Lázaro ([@Lazaroo1](https://github.com/Lazaroo1))
+- Lázaro Díaz — carnet 24713
 - Jorge Villeda — carnet 24932
 
 ---
