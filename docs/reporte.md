@@ -283,4 +283,261 @@ Esto también lo verifica automáticamente la prueba `test_gramatica_uno_da_exac
 
 ## 3. Ejemplos y pruebas realizadas
 
-<!-- pendiente -->
+Mediciones realizadas el 19 de octubre de 2026 en Windows, con Intel Core i5-10400
+CPU @ 2.90 GHz y Python 3.13.13. Cada fila corresponde a una ejecución real de
+`main.py --repeticiones 1000`: se informa el promedio de las llamadas a CYK,
+sin lectura, conversión, tokenización, conteo, árbol ni impresión. Los tiempos
+dependen del procesador, de la versión de Python y de la carga del sistema.
+
+Comando reproducible (cambiar gramática y frase según la tabla):
+
+```powershell
+python main.py -g gramaticas/ingles.txt -f "he cooks" --repeticiones 1000 --sin-imagen
+```
+
+### 3.1 Frases en el lenguaje
+
+| Frase | Resultado | Tiempo CYK promedio (ms) | Comentario |
+|---|---|---|---|
+| `She eats a cake with a fork` | SÍ | 0.0479 | Ejemplo del enunciado: VP seguido de PP. |
+| `The cat drinks the beer.` | SÍ | 0.0337 | Mayúscula y punto normalizados. |
+| `he cooks` | SÍ | 0.0206 | La frase más corta. |
+| `the dog eats` | SÍ | 0.0283 | Sujeto con determinante. |
+| `she cuts the meat with a knife` | SÍ | 0.0482 | Complemento instrumental. |
+| `he drinks the juice in the oven` | SÍ | 0.0506 | Correcta sintácticamente, extraña semánticamente. |
+| `the cat cooks a soup with a spoon in the oven` | SÍ | 0.1108 | Dos PP sucesivos. |
+| `a dog drinks the soup` | SÍ | 0.0342 | Verbo con objeto directo. |
+| `the fork eats the cat` | SÍ | 0.0335 | Sintaxis válida aunque el significado sea absurdo. |
+| `a cake eats she` | SÍ | 0.0277 | La gramática permite she como objeto. |
+
+### 3.2 Frases fuera del lenguaje
+
+| Frase | Resultado | Tiempo CYK promedio (ms) | Comentario |
+|---|---|---|---|
+| `She eats a cake with` | NO | 0.0335 | PP incompleto. |
+| `cat drinks the beer` | NO | 0.0280 | Falta determinante del sujeto. |
+| `the cat drinks beer` | NO | 0.0325 | Falta determinante de beer. |
+| `the cat the beer` | NO | 0.0282 | Falta verbo. |
+| `he she eats` | NO | 0.0246 | Dos sujetos seguidos. |
+| `eats a cake` | NO | 0.0304 | Falta sujeto. |
+| `she with a fork eats` | NO | 0.0366 | PP antes del verbo. |
+| `the the cat eats` | NO | 0.0316 | Determinante duplicado. |
+| `she eats pizza` | NO | 0.0236 | pizza no pertenece al vocabulario. |
+| `she eats athe cake` | NO | 0.0294 | athe se conserva como palabra desconocida. |
+| *(vacía)* | NO | 0.0178 | El inglés no genera ε. |
+
+### 3.3 Gramática 1
+
+| Frase | Resultado | Tiempo CYK promedio (ms) | Comentario |
+|---|---|---|---|
+| `(id*id)+id` | SÍ | 0.0766 | Ejemplo del catedrático. |
+| `( id * id ) + id` | SÍ | 0.0752 | Mismos tokens con espacios. |
+| `id` | SÍ | 0.0203 | Terminal simple. |
+| `id+id` | SÍ | 0.0297 | Suma. |
+| `id*id` | SÍ | 0.0326 | Producto. |
+| `((id))` | SÍ | 0.0445 | Paréntesis anidados. |
+| `id+id*id` | SÍ | 0.0640 | Producto dentro de suma. |
+| `(id+id)*id` | SÍ | 0.0906 | Suma entre paréntesis. |
+| `(id*id` | NO | 0.0340 | Falta cierre de paréntesis. |
+| `id+` | NO | 0.0301 | Falta operando derecho. |
+| `+id` | NO | 0.0222 | Falta operando izquierdo. |
+| `id id` | NO | 0.0228 | Falta operador. |
+| `()` | NO | 0.0330 | Falta expresión interior. |
+| `id**id` | NO | 0.0324 | Operador duplicado. |
+| *(vacía)* | NO | 0.0194 | La gramática no genera ε. |
+| `idid` | NO | 0.0212 | idid es desconocido. |
+
+La conversión de `1.txt` elimina ε y unitarias, conserva los símbolos útiles,
+reemplaza terminales y binariza cuerpos. El resultado coincide exactamente con
+`1-cnf.txt`; el desarrollo completo está en [§1.6](#16-ejemplo-paso-a-paso-con-1txt).
+
+### 3.4 Parse trees
+
+Las imágenes siguientes se generaron con Graphviz a partir del retroceso de CYK.
+Las hojas mantienen el orden de los tokens; el árbol de expresiones usa la CNF.
+
+![Árbol de She eats a cake with a fork](imagenes/ingles_fork.png)
+
+![Árbol de The cat drinks the beer.](imagenes/ingles_beer.png)
+
+![Árbol de (id*id)+id](imagenes/expresion.png)
+
+El primer árbol en consola:
+
+```text
+S
+├── NP
+│   └── she
+└── VP
+    ├── VP
+    │   ├── V
+    │   │   └── eats
+    │   └── NP
+    │       ├── Det
+    │       │   └── a
+    │       └── N
+    │           └── cake
+    └── PP
+        ├── P
+        │   └── with
+        └── NP
+            ├── Det
+            │   └── a
+            └── N
+                └── fork
+```
+
+### 3.5 Ambigüedad
+
+Con `gramaticas/ambigua.txt`, `id+id*id` tiene **2** árboles: la suma puede ser
+la operación de la raíz o puede serlo el producto. `id+id+id*id` tiene **5**.
+La gramática no impone precedencia; el programa cuenta las derivaciones de la
+CNF y muestra la primera según el orden de cortes y producciones.
+
+```powershell
+python main.py -g gramaticas/ambigua.txt -f "id+id*id" --sin-imagen
+```
+
+### 3.6 Salida completa de consola
+
+Ejecución de `python main.py -f "She eats a cake with a fork" --sin-imagen`:
+
+```text
+Gramática: gramaticas\ingles.txt
+
+══ GRAMÁTICA ORIGINAL ══
+S -> NP VP
+VP -> VP PP | V NP | cooks | drinks | eats | cuts
+PP -> P NP
+NP -> Det N | he | she
+V -> cooks | drinks | eats | cuts
+P -> in | with
+N -> cat | dog | beer | cake | juice | meat | soup | fork | knife | oven | spoon
+Det -> a | the
+Símbolo inicial: S | Variables (8): S, VP, PP, NP, V, P, N, Det | Terminales (21): cooks, drinks, eats, cuts, he, she, in, with, cat, dog, beer, cake, juice, meat, soup, fork, knife, oven, spoon, a, the | Producciones: 30
+
+── Paso 1: Eliminar producciones ε ──
+Anulables: ninguno
+(sin cambios)
+
+── Paso 2: Eliminar producciones unitarias ──
+Parejas unitarias: (S, S), (VP, VP), (PP, PP), (NP, NP), (V, V), (P, P), (N, N), (Det, Det)
+(sin cambios)
+
+── Paso 3: Eliminar símbolos inútiles ──
+No generadores: ninguno
+No alcanzables: ninguno
+(sin cambios)
+
+── Paso 4: CNF (a): reemplazar terminales en cuerpos largos ──
+Variables nuevas: ninguna
+(sin cambios)
+
+── Paso 5: CNF (b): binarizar cuerpos largos ──
+Variables nuevas: ninguna
+(sin cambios)
+
+══ GRAMÁTICA EN CNF ══
+S -> NP VP
+VP -> VP PP | V NP | cooks | drinks | eats | cuts
+PP -> P NP
+NP -> Det N | he | she
+V -> cooks | drinks | eats | cuts
+P -> in | with
+N -> cat | dog | beer | cake | juice | meat | soup | fork | knife | oven | spoon
+Det -> a | the
+Símbolo inicial: S | Variables (8): S, VP, PP, NP, V, P, N, Det | Terminales (21): cooks, drinks, eats, cuts, he, she, in, with, cat, dog, beer, cake, juice, meat, soup, fork, knife, oven, spoon, a, the | Producciones: 30
+
+La gramática ya estaba en CNF: la conversión no cambia nada.
+
+Tiempo de conversión a CNF: 0.4589 ms
+Frase: She eats a cake with a fork
+Tokens (7): she | eats | a | cake | with | a | fork
+Resultado: SÍ — la frase pertenece al lenguaje de la gramática.
+Tiempo de validación (CYK): 0.0682 ms
+Tabla CYK (fila = longitud de la subcadena, columna = posición inicial):
+7 │ {S}
+6 │ ∅        {VP}
+5 │ ∅        ∅        ∅
+4 │ {S}      ∅        ∅        ∅
+3 │ ∅        {VP}     ∅        ∅        {PP}
+2 │ {S}      ∅        {NP}     ∅        ∅        {NP}
+1 │ {NP}     {VP, V}  {Det}    {N}      {P}      {Det}    {N}
+  │ she      eats     a        cake     with     a        fork
+Árboles de derivación: 1
+Parse tree:
+S
+├── NP
+│   └── she
+└── VP
+    ├── VP
+    │   ├── V
+    │   │   └── eats
+    │   └── NP
+    │       ├── Det
+    │       │   └── a
+    │       └── N
+    │           └── cake
+    └── PP
+        ├── P
+        │   └── with
+        └── NP
+            ├── Det
+            │   └── a
+            └── N
+                └── fork
+Notación con corchetes:
+[S [NP she] [VP [VP [V eats] [NP [Det a] [N cake]]] [PP [P with] [NP [Det a] [N fork]]]]]
+```
+
+### 3.7 Pruebas automatizadas
+
+```powershell
+python -m unittest discover -s pruebas -t . -v
+```
+
+Se ejecutaron **140 pruebas**, todas satisfactorias, con Graphviz instalado.
+Los casos parametrizados se ejecutan dentro de esos métodos y no se suman al
+contador de `unittest`. Resumen real de la ejecución:
+
+```text
+Ran 140 tests in 9.667s
+
+OK
+```
+
+| Archivo de prueba | Qué verifica |
+|---|---|
+| [`test_arbol_sintactico.py`](../pruebas/test_arbol_sintactico.py) | Estructuras exactas y hojas de los árboles recuperados de CYK. |
+| [`test_archivos_gramaticas.py`](../pruebas/test_archivos_gramaticas.py) | Pruebas de los archivos de gramáticas de ejemplo (carpeta gramaticas/). |
+| [`test_cyk.py`](../pruebas/test_cyk.py) | Casos de referencia del enunciado y límites del reconocedor CYK. |
+| [`test_eliminar_epsilon.py`](../pruebas/test_eliminar_epsilon.py) | Pruebas del paso 1: anulables y eliminación de producciones ε. |
+| [`test_eliminar_inutiles.py`](../pruebas/test_eliminar_inutiles.py) | Pruebas del paso 3: generadores, alcanzables y eliminación de símbolos inútiles. |
+| [`test_eliminar_unitarias.py`](../pruebas/test_eliminar_unitarias.py) | Pruebas del paso 2: parejas unitarias y eliminación de producciones unitarias. |
+| [`test_escritor_gramatica.py`](../pruebas/test_escritor_gramatica.py) | Pruebas del escritor de gramáticas (Gramatica -> texto/archivo). |
+| [`test_estructura.py`](../pruebas/test_estructura.py) | Prueba de humo: la estructura base del proyecto existe y se puede importar. |
+| [`test_forma_normal_chomsky.py`](../pruebas/test_forma_normal_chomsky.py) | Pruebas de la Forma Normal de Chomsky: validación y conversión. |
+| [`test_formato_cyk.py`](../pruebas/test_formato_cyk.py) | Comparaciones exactas del formato de la tabla CYK. |
+| [`test_formato_pasos.py`](../pruebas/test_formato_pasos.py) | Pruebas del texto del paso a paso de la conversión a CNF. |
+| [`test_gramatica.py`](../pruebas/test_gramatica.py) | Pruebas del modelo de datos Gramatica. |
+| [`test_integracion.py`](../pruebas/test_integracion.py) | Pruebas completas desde archivos hasta reconocimiento, árboles y consola. |
+| [`test_lector_gramatica.py`](../pruebas/test_lector_gramatica.py) | Pruebas del lector de gramáticas (texto/archivo -> Gramatica). |
+| [`test_main.py`](../pruebas/test_main.py) | Pruebas del programa principal (main.py) ejecutándolo como lo haría el usuario. |
+| [`test_propiedades_cyk.py`](../pruebas/test_propiedades_cyk.py) | Contrasta CYK con reconocimiento y generación independientes de la CNF. |
+| [`test_tokenizador.py`](../pruebas/test_tokenizador.py) | Pruebas de tokenización con los vocabularios reales. |
+| [`test_visualizacion_arbol.py`](../pruebas/test_visualizacion_arbol.py) | Comprueba las salidas de texto del árbol sintáctico. |
+
+La prueba `test_gramatica_uno_da_exactamente_1_cnf` compara el texto convertido
+con la referencia del catedrático. La integración compara además las 781
+secuencias de cero a cuatro tokens sobre `{id, +, *, (, )}`.
+
+Las pruebas de propiedades contrastan **4206** expresiones con un reconocedor
+descendente independiente y **9723** secuencias del vocabulario inglés con
+generación exhaustiva: **cero diferencias**. Se generan 496 frases inglesas
+de hasta cuatro palabras (8 de dos, 104 de tres y 384 de cuatro); de las 9723
+secuencias examinadas, 112 son aceptadas. Se comprueban también 200 derivaciones
+aleatorias desde cuatro gramáticas originales. Las tres pruebas de propiedades
+tardaron 0.539 s en una ejecución separada.
+
+La cadena vacía de `anbn.txt` se acepta mediante `genera_cadena_vacia`; su árbol
+se representa como `[S ε]`, de modo que la hoja ε representa cero tokens.
