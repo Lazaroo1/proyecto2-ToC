@@ -26,3 +26,15 @@ def tabla_cyk_a_texto(resultado: ResultadoCYK, orden_variables: list[str]) -> st
     lineas.append(" " * digitos + " │ "
                   + "  ".join(token.ljust(ancho) for token in resultado.tokens).rstrip())
     return "\n".join(lineas)
+
+
+def formatear_resultado(frase: str, tokens: list[str], tokens_desconocidos: list[str],
+                       acepta: bool) -> str:
+    """Muestra frase, tokens, aviso opcional y decisión de pertenencia."""
+    lineas = [f"Frase: {frase}", f"Tokens ({len(tokens)}): {' | '.join(tokens)}"]
+    if tokens_desconocidos:
+        lineas.append("Aviso: estas palabras no son terminales de la gramática: "
+                      + ", ".join(tokens_desconocidos))
+    decision = "SÍ — la frase pertenece" if acepta else "NO — la frase no pertenece"
+    lineas.append(f"Resultado: {decision} al lenguaje de la gramática.")
+    return "\n".join(lineas)

@@ -13,14 +13,22 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import re
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 from algoritmos.forma_normal_chomsky import ResultadoConversionCNF, convertir_a_cnf
+from algoritmos.cyk import construir_arbol_sintactico, cyk
 from entrada_salida.escritor_gramatica import guardar_gramatica_en_archivo
 from entrada_salida.formato_pasos import formatear_conversion, formatear_gramatica_con_titulo
 from entrada_salida.lector_gramatica import ErrorFormatoGramatica, leer_gramatica_desde_archivo
+from entrada_salida.formato_cyk import formatear_resultado, tabla_cyk_a_texto
+from entrada_salida.tokenizador import encontrar_tokens_desconocidos, tokenizar_frase
+from entrada_salida.visualizacion_arbol import (
+    arbol_a_corchetes, arbol_a_texto, exportar_arbol_imagen,
+)
 
 CARPETA_DEL_PROYECTO = Path(__file__).resolve().parent
 RUTA_GRAMATICA_POR_DEFECTO = CARPETA_DEL_PROYECTO / "gramaticas" / "ingles.txt"
@@ -62,6 +70,11 @@ def construir_analizador_argumentos() -> argparse.ArgumentParser:
         metavar="RUTA",
         help="guardar la gramática en CNF en ese archivo",
     )
+    analizador.add_argument("-f", "--frase", metavar="TEXTO", help="frase que se desea validar")
+    analizador.add_argument("--sin-tabla", action="store_true", help="omitir la tabla CYK")
+    analizador.add_argument("--sin-imagen", action="store_true", help="omitir la exportación del árbol")
+    analizador.add_argument("--salida", type=Path, default=CARPETA_DEL_PROYECTO / "salidas",
+                            metavar="CARPETA", help="carpeta para los árboles exportados")
     return analizador
 
 
@@ -103,6 +116,38 @@ def obtener_ruta_legible(ruta: Path) -> str:
         return str(ruta)
 
 
+def analizar_frase(frase: str, conversion: ResultadoConversionCNF,
+                   argumentos: argparse.Namespace) -> None:
+    """Tokeniza, reconoce y presenta la tabla y el árbol de una frase."""
+    gramatica = conversion.gramatica_cnf
+    tokens = tokenizar_frase(frase, gramatica.terminales)
+    resultado = cyk(gramatica, tokens, conversion.genera_cadena_vacia)
+    desconocidos = encontrar_tokens_desconocidos(tokens, gramatica.terminales)
+    print(formatear_resultado(frase, tokens, desconocidos, resultado.acepta))
+    if not argumentos.sin_tabla:
+        print(tabla_cyk_a_texto(resultado, gramatica.variables))
+    arbol = construir_arbol_sintactico(resultado, gramatica.simbolo_inicial)
+    if arbol is None:
+        return
+    print("Parse tree:")
+    print(arbol_a_texto(arbol))
+    print("Notación con corchetes:")
+    print(arbol_a_corchetes(arbol))
+    if not argumentos.sin_imagen:
+        nombre = re.sub(r"[^\w]+", "_", "_".join(tokens).lower(), flags=re.ASCII).strip("_")
+        nombre = nombre[:60] or "arbol"
+        ruta_base = argumentos.salida / f"arbol_{nombre}"
+        try:
+            imagen = exportar_arbol_imagen(arbol, ruta_base)
+            if imagen is None:
+                print("Graphviz no está instalado. Archivo DOT: "
+                      + obtener_ruta_legible(ruta_base.with_suffix(".dot")))
+            else:
+                print(f"Imagen del árbol: {obtener_ruta_legible(imagen)}")
+        except (OSError, subprocess.CalledProcessError) as error:
+            print(f"No se pudo exportar la imagen del árbol: {error}", file=sys.stderr)
+
+
 def main(argumentos_linea: list[str] | None = None) -> int:
     """Ejecuta el programa.
 
@@ -138,6 +183,18 @@ def main(argumentos_linea: list[str] | None = None) -> int:
     if argumentos.guardar_cnf is not None:
         guardar_gramatica_en_archivo(resultado.gramatica_cnf, argumentos.guardar_cnf)
         print(f"Gramática en CNF guardada en: {obtener_ruta_legible(argumentos.guardar_cnf)}")
+    if argumentos.frase is not None:
+        analizar_frase(argumentos.frase, resultado, argumentos)
+    else:
+        while True:
+            try:
+                frase = input("Escribe una frase (o 'salir' para terminar): ")
+                if frase.strip().lower() == "salir":
+                    break
+                analizar_frase(frase, resultado, argumentos)
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
     return 0
 
 

@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import main
 from entrada_salida.lector_gramatica import leer_gramatica_desde_archivo
@@ -27,7 +28,7 @@ def ejecutar_programa(
         capture_output=True,
         text=True,
         encoding="utf-8",
-        input=texto_de_entrada,
+        input=texto_de_entrada if texto_de_entrada is not None else "",
         env=entorno,
         timeout=120,
         check=False,
@@ -77,10 +78,35 @@ class PruebaConversionDesdeLaConsola(unittest.TestCase):
 
     def test_main_se_puede_llamar_directamente(self) -> None:
         salida_capturada = io.StringIO()
-        with contextlib.redirect_stdout(salida_capturada):
+        with contextlib.redirect_stdout(salida_capturada), patch("builtins.input", side_effect=EOFError):
             codigo_de_salida = main.main(["-g", str(RUTA_GRAMATICAS / "anbn.txt"), "--sin-pasos"])
         self.assertEqual(codigo_de_salida, 0)
         self.assertIn("S -> A Z | A B", salida_capturada.getvalue())
+
+    def test_frases_desde_la_consola(self) -> None:
+        for argumentos, textos in [
+            (["-f", "She eats a cake with a fork"], ["Resultado: SÍ", "└── fork"]),
+            (["-f", "she eats pizza"], ["Resultado: NO", "Aviso:", "pizza"]),
+            (["-g", "gramaticas/1.txt", "-f", "(id*id)+id"], ["Resultado: SÍ"]),
+            (["-g", "gramaticas/anbn.txt", "-f", ""], ["Resultado: SÍ", "└── ε"]),
+        ]:
+            with self.subTest(argumentos=argumentos):
+                ejecucion = ejecutar_programa(*argumentos, "--sin-imagen")
+                self.assertEqual(ejecucion.returncode, 0, ejecucion.stderr)
+                for texto in textos:
+                    self.assertIn(texto, ejecucion.stdout)
+
+    def test_modo_interactivo(self) -> None:
+        ejecucion = ejecutar_programa("--sin-imagen", texto_de_entrada="he cooks\nsalir\n")
+        self.assertEqual(ejecucion.returncode, 0, ejecucion.stderr)
+        self.assertIn("Resultado: SÍ", ejecucion.stdout)
+        self.assertEqual(ejecucion.stdout.count("GRAMÁTICA ORIGINAL"), 1)
+
+    def test_interrupcion_y_opciones(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()), patch("builtins.input", side_effect=KeyboardInterrupt):
+            self.assertEqual(main.main(["--sin-imagen"]), 0)
+        ejecucion = ejecutar_programa("-f", "he cooks", "--sin-tabla", "--sin-imagen")
+        self.assertNotIn("Tabla CYK", ejecucion.stdout)
 
 
 if __name__ == "__main__":

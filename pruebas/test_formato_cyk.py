@@ -3,7 +3,7 @@
 import unittest
 
 from algoritmos.cyk import cyk
-from entrada_salida.formato_cyk import tabla_cyk_a_texto
+from entrada_salida.formato_cyk import formatear_resultado, tabla_cyk_a_texto
 from entrada_salida.lector_gramatica import leer_gramatica_desde_archivo
 from pruebas.test_cyk import RUTA_GRAMATICAS
 
@@ -20,6 +20,15 @@ TABLA_INGLES = """Tabla CYK (fila = longitud de la subcadena, columna = posició
 
 class PruebaFormatoCYK(unittest.TestCase):
     """Comprueba espacios, orden, celdas vacías y tokens."""
+
+    def test_resultado_y_aviso(self) -> None:
+        self.assertEqual(formatear_resultado("he cooks", ["he", "cooks"], [], True),
+                         "Frase: he cooks\nTokens (2): he | cooks\n"
+                         "Resultado: SÍ — la frase pertenece al lenguaje de la gramática.")
+        self.assertEqual(formatear_resultado("pizza", ["pizza"], ["pizza"], False),
+                         "Frase: pizza\nTokens (1): pizza\n"
+                         "Aviso: estas palabras no son terminales de la gramática: pizza\n"
+                         "Resultado: NO — la frase no pertenece al lenguaje de la gramática.")
 
     def test_tablas_exactas(self) -> None:
         gramatica = leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "ingles.txt")
