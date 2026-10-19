@@ -112,6 +112,12 @@ class PruebaConversionDesdeLaConsola(unittest.TestCase):
         self.assertEqual(ejecucion.returncode, 2)
         self.assertIn("mayor o igual a 1", ejecucion.stderr)
 
+    def test_ambiguedad(self) -> None:
+        ejecucion = ejecutar_programa("-g", "gramaticas/ambigua.txt", "-f", "id+id*id", "--sin-imagen")
+        self.assertEqual(ejecucion.returncode, 0, ejecucion.stderr)
+        self.assertIn("Árboles de derivación: 2", ejecucion.stdout)
+        self.assertIn("la frase es ambigua", ejecucion.stdout)
+
     def test_interrupcion_y_opciones(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), patch("builtins.input", side_effect=KeyboardInterrupt):
             self.assertEqual(main.main(["--sin-imagen"]), 0)

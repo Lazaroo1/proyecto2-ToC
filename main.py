@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from algoritmos.forma_normal_chomsky import ResultadoConversionCNF, convertir_a_cnf
-from algoritmos.cyk import construir_arbol_sintactico, cyk
+from algoritmos.cyk import construir_arbol_sintactico, contar_arboles_de_derivacion, cyk
 from entrada_salida.escritor_gramatica import guardar_gramatica_en_archivo
 from entrada_salida.formato_pasos import formatear_conversion, formatear_gramatica_con_titulo
 from entrada_salida.lector_gramatica import ErrorFormatoGramatica, leer_gramatica_desde_archivo
@@ -137,6 +137,10 @@ def analizar_frase(frase: str, conversion: ResultadoConversionCNF,
     arbol = construir_arbol_sintactico(resultado, gramatica.simbolo_inicial)
     if arbol is None:
         return
+    cantidad_arboles = contar_arboles_de_derivacion(gramatica, tokens, conversion.genera_cadena_vacia)
+    aviso = (" (la frase es ambigua en esta gramática; se muestra el primero)"
+             if cantidad_arboles > 1 else "")
+    print(f"Árboles de derivación: {cantidad_arboles}{aviso}")
     print("Parse tree:")
     print(arbol_a_texto(arbol))
     print("Notación con corchetes:")

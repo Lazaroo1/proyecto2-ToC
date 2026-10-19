@@ -3,10 +3,11 @@
 import unittest
 from pathlib import Path
 
-from algoritmos.cyk import cyk
+from algoritmos.cyk import contar_arboles_de_derivacion, cyk
 from algoritmos.forma_normal_chomsky import convertir_a_cnf
 from entrada_salida.lector_gramatica import leer_gramatica_desde_archivo
 from entrada_salida.tokenizador import tokenizar_frase
+from entrada_salida.escritor_gramatica import gramatica_a_texto
 
 RUTA_GRAMATICAS = Path(__file__).resolve().parent.parent / "gramaticas"
 FRASES_INGLES_SI = [
@@ -82,3 +83,31 @@ class PruebaCYK(unittest.TestCase):
         self.assertFalse(cyk(gramatica, []).acepta)
         self.assertTrue(cyk(gramatica, [], True).acepta)
         self.assertEqual(cyk(gramatica, []).tabla, [])
+
+    def test_conteo_ingles_y_vacia(self) -> None:
+        gramatica = leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "ingles.txt")
+        for esperado, frases in [(1, FRASES_INGLES_SI), (0, FRASES_INGLES_NO)]:
+            for frase in frases:
+                with self.subTest(frase=frase):
+                    tokens = tokenizar_frase(frase, gramatica.terminales)
+                    self.assertEqual(contar_arboles_de_derivacion(gramatica, tokens), esperado)
+        original = leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "anbn.txt")
+        gramatica = convertir_a_cnf(original).gramatica_cnf
+        self.assertEqual(contar_arboles_de_derivacion(gramatica, [], True), 1)
+        self.assertEqual(contar_arboles_de_derivacion(gramatica, []), 0)
+        with self.assertRaises(ValueError):
+            contar_arboles_de_derivacion(original, [])
+
+    def test_ambiguedad_y_cnf_exacta(self) -> None:
+        gramatica = convertir_a_cnf(
+            leer_gramatica_desde_archivo(RUTA_GRAMATICAS / "ambigua.txt")).gramatica_cnf
+        self.assertEqual(gramatica_a_texto(gramatica),
+                         "E -> E Z | E Y | L X | id\nZ -> P E\nY -> M E\nX -> E R\n"
+                         "P -> +\nM -> *\nL -> (\nR -> )")
+        for frase, esperado in [("id+id*id", 2), ("id+id+id*id", 5), ("id", 1),
+                                 ("(id)", 1), ("id+", 0)]:
+            with self.subTest(frase=frase):
+                tokens = tokenizar_frase(frase, gramatica.terminales)
+                self.assertEqual(contar_arboles_de_derivacion(gramatica, tokens), esperado)
+        resultado = cyk(gramatica, tokenizar_frase("id+id*id", gramatica.terminales))
+        self.assertEqual(resultado.retroceso[(0, 4, "E")], (0, "E", "Z"))
