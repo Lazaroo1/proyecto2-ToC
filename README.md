@@ -64,3 +64,13 @@ Las gramáticas se escriben en archivos `.txt` dentro de [`gramaticas/`](gramati
 ## Estado
 
 En desarrollo.
+
+## Graphviz (opcional, para la imagen del árbol)
+
+En Windows se puede instalar con `winget install --id Graphviz.Graphviz -e`.
+Verifica la instalación con `dot -V`. Si no se reconoce el comando, agrega
+`C:\Program Files\Graphviz\bin` al PATH y abre otra terminal. El programa también
+busca las rutas habituales de instalación de Windows.
+
+Sin Graphviz el programa funciona igual y guarda el archivo `.dot`, que puede
+abrirse en cualquier visor de DOT.
